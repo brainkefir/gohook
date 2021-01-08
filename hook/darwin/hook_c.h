@@ -6,6 +6,8 @@
  * (at your option) any later version.
 */
 
+static Boolean mouseBtMiddledown = false;
+
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -937,10 +939,16 @@ CGEventRef hook_event_proc(CGEventTapProxy tap_proxy, CGEventType type, CGEventR
 	switch (type) {
 		case kCGEventKeyDown:
 			process_key_pressed(timestamp, event_ref);
+			if ( mouseBtMiddledown == true) {
+				CGEventSetFlags(event_ref, kCGEventFlagMaskCommand); //add Command key pressed
+			}
 			break;
 
 		case kCGEventKeyUp:
 			process_key_released(timestamp, event_ref);
+			if ( mouseBtMiddledown == true) {
+				CGEventSetFlags(event_ref, kCGEventFlagMaskCommand); //add Command key pressed
+			}
 			break;
 
 		case kCGEventFlagsChanged:
@@ -974,6 +982,11 @@ CGEventRef hook_event_proc(CGEventTapProxy tap_proxy, CGEventType type, CGEventR
 				}
 
 				process_button_pressed(timestamp, event_ref, button);
+
+				if (button == 3) {
+					mouseBtMiddledown = true;
+					event.reserved = 1; //stop event propagation
+				}
 			}
 			break;
 
@@ -1000,18 +1013,47 @@ CGEventRef hook_event_proc(CGEventTapProxy tap_proxy, CGEventType type, CGEventR
 				}
 
 				process_button_pressed(timestamp, event_ref, button);
+
+				if (button == 3) {
+					mouseBtMiddledown = false;
+					event.reserved = 1; //stop event propagation
+				}
 			}
 			break;
 
 
 		case kCGEventLeftMouseDragged:
 		case kCGEventRightMouseDragged:
-		case kCGEventOtherMouseDragged:
 			// FIXME The drag flag is confusing.  Use prev x,y to determine click.
 			// Set the mouse dragged flag.
 			mouse_dragged = true;
 			process_mouse_moved(timestamp, event_ref);
 			break;
+		case kCGEventOtherMouseDragged:
+			if ( mouseBtMiddledown == true) {
+				//mouseBtMiddledown is initially interpreted as dragging (kCGEventOtherMouseDragged) who disturb other programs, we need to change it to simple move (kCGEventMouseMoved)
+				CGPoint location = CGEventGetLocation(event_ref);
+				event_ref = CGEventCreateMouseEvent(NULL,
+					kCGEventMouseMoved,
+					CGPointMake(
+						(CGFloat) location.x,
+						(CGFloat) location.y
+					),
+					0
+				);
+				//like in kCGEventMouseMoved case:
+				// Set the mouse dragged flag.
+				mouse_dragged = false;
+				process_mouse_moved(timestamp, event_ref);
+			} else {
+				//like in kCGEventLeftMouseDragged case:
+				// FIXME The drag flag is confusing.  Use prev x,y to determine click.
+				// Set the mouse dragged flag.
+				mouse_dragged = true;
+				process_mouse_moved(timestamp, event_ref);
+				break;
+			}
+
 
 		case kCGEventMouseMoved:
 			// Set the mouse dragged flag.
@@ -1022,6 +1064,9 @@ CGEventRef hook_event_proc(CGEventTapProxy tap_proxy, CGEventType type, CGEventR
 
 		case kCGEventScrollWheel:
 			process_mouse_wheel(timestamp, event_ref);
+			if ( mouseBtMiddledown == true) {
+					event.reserved = 1; //stop event propagation
+			}
 			break;
 
 
@@ -1083,28 +1128,29 @@ IOHOOK_API int hook_run() {
 					#ifdef USE_DEBUG
 					CGEventMask event_mask = kCGEventMaskForAllEvents;
 					#else
+					//limit listening events
 					CGEventMask event_mask =	CGEventMaskBit(kCGEventKeyDown) |
 												CGEventMaskBit(kCGEventKeyUp) |
-												CGEventMaskBit(kCGEventFlagsChanged) |
+//												CGEventMaskBit(kCGEventFlagsChanged) |
 
-												CGEventMaskBit(kCGEventLeftMouseDown) |
-												CGEventMaskBit(kCGEventLeftMouseUp) |
-												CGEventMaskBit(kCGEventLeftMouseDragged) |
+												// CGEventMaskBit(kCGEventLeftMouseDown) |
+												// CGEventMaskBit(kCGEventLeftMouseUp) |
+												// CGEventMaskBit(kCGEventLeftMouseDragged) |
 
-												CGEventMaskBit(kCGEventRightMouseDown) |
-												CGEventMaskBit(kCGEventRightMouseUp) |
-												CGEventMaskBit(kCGEventRightMouseDragged) |
+												// CGEventMaskBit(kCGEventRightMouseDown) |
+												// CGEventMaskBit(kCGEventRightMouseUp) |
+												// CGEventMaskBit(kCGEventRightMouseDragged) |
 
 												CGEventMaskBit(kCGEventOtherMouseDown) |
 												CGEventMaskBit(kCGEventOtherMouseUp) |
 												CGEventMaskBit(kCGEventOtherMouseDragged) |
 
-												CGEventMaskBit(kCGEventMouseMoved) |
-												CGEventMaskBit(kCGEventScrollWheel) |
+												// CGEventMaskBit(kCGEventMouseMoved) |
+												CGEventMaskBit(kCGEventScrollWheel);
 
 												// NOTE This event is undocumented and used
 												// for caps-lock release and multi-media keys.
-												CGEventMaskBit(NX_SYSDEFINED);
+												// CGEventMaskBit(NX_SYSDEFINED);
 					#endif
 
 					// Create the event tap.

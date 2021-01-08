@@ -11,6 +11,7 @@
 package hook
 
 /*
+//#cgo darwin CFLAGS: -x objective-c -Wno-deprecated-declarations -DUSE_DEBUG
 #cgo darwin CFLAGS: -x objective-c -Wno-deprecated-declarations
 #cgo darwin LDFLAGS: -framework Cocoa
 

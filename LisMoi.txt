@@ -1,0 +1,3 @@
+ Pour logguer en debug ajouter -DUSE_DEBUG dans les processor directives de hook.go
+ 
+ #cgo darwin CFLAGS: -x objective-c -Wno-deprecated-declarations -DUSE_DEBUG
